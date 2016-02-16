@@ -133,6 +133,15 @@ describe('mysqlWrap', function () {
             .done();
         });
 
+        it('should propogate stack trace to application code', function (done) {
+            let that = this;
+            that.sql.query('SELECT wrong FROM `table`')
+            .catch(function (err) {
+                chai.assert.ok(/test\.js/.test(err.stack));
+                done();
+            }).done();
+        });
+
         it('should be case insensitive', function (done) {
             let that = this;
             that.sql.query('sElEcT * FRoM `table` Where id = ?', [3])

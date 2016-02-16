@@ -3,6 +3,8 @@
 let _ = require('lodash');
 let Q = require('q');
 
+Q.longStackSupport = true;
+
 let createMySQLWrap = function (poolCluster, options) {
     options = options || {};
 
