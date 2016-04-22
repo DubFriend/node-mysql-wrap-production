@@ -3,6 +3,8 @@
 let _ = require('lodash');
 let Q = require('q');
 
+Q.longStackSupport = true;
+
 let createMySQLWrap = function (poolCluster, options) {
     options = options || {};
 
@@ -107,14 +109,14 @@ let createMySQLWrap = function (poolCluster, options) {
         };
     };
 
+    let isSQLReadOrWrite = function (statementRaw) {
+        return /^SELECT/i.test(statementRaw.trim()) ? 'read' : 'write';
+    };
+
     self.query = function (statementRaw, values) {
         let statementObject = getStatementObject(statementRaw);
 
-        let readOrWrite = function () {
-            return /^SELECT/i.test(statementObject.sql.trim()) ? 'read' : 'write';
-        };
-
-        return getConnection(readOrWrite())
+        return getConnection(isSQLReadOrWrite(statementObject.sql))
         .then(function (conn) {
             return Q.Promise(function (resolve, reject) {
                 conn.query(statementObject, values || [], function (err, rows) {
@@ -130,6 +132,26 @@ let createMySQLWrap = function (poolCluster, options) {
         });
     };
 
+    self.queryStream = function (statementRaw, values) {
+        let statementObject = getStatementObject(statementRaw);
+
+        return getConnection(isSQLReadOrWrite(statementObject.sql))
+        .then(function (conn) {
+            let stream = conn.query(statementObject, values || []).stream();
+
+            stream.on('error', err => {
+                console.error(err);
+                conn && conn.release && conn.release();
+            });
+
+            stream.on('end', () => {
+                conn && conn.release && conn.release();
+            });
+
+            return stream;
+        });
+    };
+
     self.one = function (statementRaw, values) {
         let statementObject = getStatementObject(statementRaw);
         statementObject.sql = stripLimit(statementObject.sql) + ' LIMIT 1';
@@ -140,20 +162,28 @@ let createMySQLWrap = function (poolCluster, options) {
         });
     };
 
-    self.select = function (tableRaw, whereEquals) {
+    let buildSelect = function (tableRaw, whereEquals) {
         let statementObject = _.isObject(tableRaw) ?
             tableRaw : { table: tableRaw };
         let where = prepareWhereEquals(whereEquals);
         let values = [statementObject.table].concat(where.values);
-
-        return self.query(
-            'SELECT ' + selectedFieldsSQL(statementObject.fields) + ' ' +
-            'FROM ?? ' + where.sql + (
-                statementObject.paginate ?
-                    ' ' + paginateLimit(statementObject.paginate) : ''
-            ),
-            values
+        let sql = 'SELECT ' + selectedFieldsSQL(statementObject.fields) + ' ' +
+        'FROM ?? ' + where.sql + (
+            statementObject.paginate ?
+                ' ' + paginateLimit(statementObject.paginate) : ''
         );
+
+        return { sql: sql, values: values };
+    };
+
+    self.select = function (tableRaw, whereEquals) {
+        let query = buildSelect(tableRaw, whereEquals);
+        return self.query(query.sql, query.values);
+    };
+
+    self.selectStream = function (tableRaw, whereEquals) {
+        let query = buildSelect(tableRaw, whereEquals);
+        return self.queryStream(query.sql, query.values);
     };
 
     self.selectOne = function (tableRaw, whereEquals) {

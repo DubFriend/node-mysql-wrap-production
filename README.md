@@ -75,7 +75,7 @@ In addition all methods also return [q](https://github.com/kriskowal/q) promises
 In the following examples, parameters marked with an asterik (\*) character are
 optional.
 
-###query(sqlStatement, \*values, \*callback)
+###query(sqlStatement, \*values)
 ```javascript
 sql.query('SELECT name FROM fruit WHERE color = "yellow"')
 .then(function (res) {
@@ -97,15 +97,46 @@ sql.query({
 });
 ```
 
-###one(sqlStatement, \*values, \*callback)
+###queryStream(sqlStatement, \*values)
+```javascript
+sql.queryStream('SELECT name FROM fruit WHERE color = "yellow"')
+.then(function (stream) {
+    stream.on('data', row => {
+        console.log(row);
+        //example output: { name: "banana" }
+    });
+
+
+    stream.on('end', () => {
+        console.log('end of stream';)
+    });
+});
+```
+
+###one(sqlStatement, \*values)
 Works the same as sql.query except it only returns a single row instead of an array
 of rows.  Adds a "LIMIT 1" clause if a LIMIT clause is not allready present in
 the sqlStatement.
 
-###select(table, \*whereEqualsObject, \*callback)
+###select(table, \*whereEqualsObject)
 ```javascript
 // equivalent to sql.query('SELECT * FROM fruit WHERE color = "yellow" AND isRipe = "true"')
 sql.select('fruit', { color: 'yellow', isRipe: true })
+```
+
+###selectStream(table, \*whereEqualsObject)
+```javascript
+sql.selectStream('fruit')
+.then(function (stream) {
+    stream.on('data', row => {
+        console.log(row);
+        //example output: { name: "banana" }
+    });
+
+    stream.on('end', () => {
+        console.log('end of stream';)
+    });
+});
 ```
 
 ###selectOne(table, \*whereEqualsObject, \*callback)

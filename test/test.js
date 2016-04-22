@@ -81,6 +81,34 @@ describe('mysqlWrap', function () {
         });
     });
 
+    describe('queryStream', function () {
+        it('should return a readable stream of rows', function (done) {
+            let expected = [this.a, this.b, this.c];
+
+            this.sql.queryStream('SELECT * FROM `table` ORDER BY `id`')
+            .then(stream => {
+                stream.on('data', row => {
+                    chai.assert.deepEqual(row, expected.shift());
+                });
+
+                stream.on('end', () => done());
+            }).done();
+        });
+    });
+
+    describe('selectStream', function () {
+        it('should return a readable stream of rows', function (done) {
+            this.sql.selectStream('table', { id: this.a.id })
+            .then(stream => {
+                stream.on('data', row => {
+                    chai.assert.deepEqual(row, this.a);
+                });
+
+                stream.on('end', () => done());
+            }).done();
+        });
+    });
+
     describe('query', function () {
         it('should select without values array', function (done) {
             let that = this;
@@ -114,6 +142,15 @@ describe('mysqlWrap', function () {
                 done();
             })
             .done();
+        });
+
+        it('should propogate stack trace to application code', function (done) {
+            let that = this;
+            that.sql.query('SELECT wrong FROM `table`')
+            .catch(function (err) {
+                chai.assert.ok(/test\.js/.test(err.stack));
+                done();
+            }).done();
         });
 
         it('should be case insensitive', function (done) {
