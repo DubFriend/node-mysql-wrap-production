@@ -8,32 +8,42 @@ let mysql = require('mysql');
 let createNodeMySQL = require('../src/mysql-wrap');
 
 describe('mysqlWrap', function () {
+    // before(function (done) {
+    //     let that = this;
+    //     that.poolCluster = mysql.createPoolCluster({
+    //         canRetry: true,
+    //         removeNodeErrorCount: 1,
+    //         restoreNodeTimeout: 20000,
+    //         defaultSelector: 'RR'
+    //     });
+    //
+    //     that.poolCluster.add('MASTER', config.mysql);
+    //     that.poolCluster.add('SLAVE_1', _.extend(config.mysql, { port: 3307}));
+    //
+    //     that.sql = createNodeMySQL(that.poolCluster, {
+    //         replication: {
+    //             write: 'MASTER',
+    //             read: 'SLAVE_*'
+    //         }
+    //     });
+    //
+    //     that.poolCluster.getConnection(
+    //         'MASTER',
+    //         function (err, conn) {
+    //             that.masterConn = conn;
+    //             done();
+    //         }
+    //     );
+    // });
+
     before(function (done) {
         let that = this;
-        that.poolCluster = mysql.createPoolCluster({
-            canRetry: true,
-            removeNodeErrorCount: 1,
-            restoreNodeTimeout: 20000,
-            defaultSelector: 'RR'
+        let pool = mysql.createPool(config.mysql);
+        that.sql = createNodeMySQL(pool);
+        pool.getConnection(function (err, conn) {
+            that.masterConn = conn;
+            done();
         });
-
-        that.poolCluster.add('MASTER', config.mysql);
-        that.poolCluster.add('SLAVE_1', _.extend(config.mysql, { port: 3307}));
-
-        that.sql = createNodeMySQL(that.poolCluster, {
-            replication: {
-                write: 'MASTER',
-                read: 'SLAVE_*'
-            }
-        });
-
-        that.poolCluster.getConnection(
-            'MASTER',
-            function (err, conn) {
-                that.masterConn = conn;
-                done();
-            }
-        );
     });
 
     beforeEach(function (done) {
@@ -54,13 +64,14 @@ describe('mysqlWrap', function () {
                             that.masterConn.query(
                                 'INSERT INTO `table2` (`field`) ' +
                                 'VALUES ("bar")',
-                                function () {
+                                function (err) {
+                                    done();
                                     // set timeout is necessary since it takes
                                     // a little time for writes to master to
                                     // propogate to the slaves
-                                    setTimeout(function () {
-                                        done();
-                                    }, 20);
+                                    // setTimeout(function () {
+                                    //     done();
+                                    // }, 20);
                                 }
                             );
                         }

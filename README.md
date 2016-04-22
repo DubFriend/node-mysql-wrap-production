@@ -16,6 +16,17 @@ for promises.
 
 ##Instantiation
 
+let pool = mysql.createPool(config.mysql);
+that.sql = createNodeMySQL(pool);
+
+```javascript
+var sql = createNodeMySQL(mysql.createPool({
+    host: config.mysql.host,
+    user: config.mysql.user,
+    password: config.mysql.password,
+}));
+```
+
 Pool Clusters with read write seperation is also supported
 ```javascript
 var poolCluster = mysql.createPoolCluster({
@@ -51,6 +62,8 @@ var sql = createNodeMySQL(poolCluster, {
     }
 });
 ```
+
+
 
 
 ##Methods
