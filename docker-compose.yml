@@ -11,16 +11,16 @@ mysql:
   container_name: mysql
   restart: always
 
-mysql_slave:
-  build: ./mysql-container
-  links:
-    - mysql
-  ports:
-    - "3307:3306"
-  environment:
-    - MYSQL_USER=admin
-    - MYSQL_PASS=admin
-    - REPLICATION_SLAVE=true
-    - STARTUP_SQL=/opt/test-database.sql
-  container_name: mysql_slave
-  restart: always
+# mysql_slave:
+#   build: ./mysql-container
+#   links:
+#     - mysql
+#   ports:
+#     - "3307:3306"
+#   environment:
+#     - MYSQL_USER=admin
+#     - MYSQL_PASS=admin
+#     - REPLICATION_SLAVE=true
+#     - STARTUP_SQL=/opt/test-database.sql
+#   container_name: mysql_slave
+#   restart: always

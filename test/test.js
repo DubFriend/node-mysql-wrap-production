@@ -8,36 +8,12 @@ let mysql = require('mysql');
 let createNodeMySQL = require('../src/mysql-wrap');
 
 describe('mysqlWrap', function () {
-    // before(function (done) {
-    //     let that = this;
-    //     that.poolCluster = mysql.createPoolCluster({
-    //         canRetry: true,
-    //         removeNodeErrorCount: 1,
-    //         restoreNodeTimeout: 20000,
-    //         defaultSelector: 'RR'
-    //     });
-    //
-    //     that.poolCluster.add('MASTER', config.mysql);
-    //     that.poolCluster.add('SLAVE_1', _.extend(config.mysql, { port: 3307}));
-    //
-    //     that.sql = createNodeMySQL(that.poolCluster, {
-    //         replication: {
-    //             write: 'MASTER',
-    //             read: 'SLAVE_*'
-    //         }
-    //     });
-    //
-    //     that.poolCluster.getConnection(
-    //         'MASTER',
-    //         function (err, conn) {
-    //             that.masterConn = conn;
-    //             done();
-    //         }
-    //     );
-    // });
-
     before(function (done) {
         let that = this;
+
+        that.stripIds = data => _.isArray(data) ?
+            _.map(data, that.stripIds) : _.omit(data, 'id');
+
         let pool = mysql.createPool(config.mysql);
         that.sql = createNodeMySQL(pool);
         pool.getConnection(function (err, conn) {
@@ -66,12 +42,6 @@ describe('mysqlWrap', function () {
                                 'VALUES ("bar")',
                                 function (err) {
                                     done();
-                                    // set timeout is necessary since it takes
-                                    // a little time for writes to master to
-                                    // propogate to the slaves
-                                    // setTimeout(function () {
-                                    //     done();
-                                    // }, 20);
                                 }
                             );
                         }
@@ -457,6 +427,29 @@ describe('mysqlWrap', function () {
                         chai.assert.deepEqual(
                             res,
                             [{ id: 3, unique: 'c', field: 'update' }]
+                        );
+                        done();
+                    }
+                );
+            })
+            .done();
+        });
+
+        it('should handle bulk save', function (done) {
+            let that = this;
+            let rows = [
+                { unique: 'a', field: 'edit-a' },
+                { unique: 'b', field: 'edit-b' },
+                { unique: 'd', field: 'new-field' }
+            ];
+            that.sql.save('table', rows)
+            .then(function () {
+                that.masterConn.query(
+                    'SELECT * FROM `table`',
+                    function (err, res) {
+                        chai.assert.sameDeepMembers(
+                            that.stripIds(res),
+                            that.stripIds(rows.concat([that.c]))
                         );
                         done();
                     }

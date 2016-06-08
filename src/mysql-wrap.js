@@ -215,13 +215,16 @@ let createMySQLWrap = function (poolCluster, options) {
         );
     };
 
-    self.save = function (table, rowRaw) {
+    self.save = function (table, rowOrRows) {
+        let rows = _.isArray(rowOrRows) ? rowOrRows : [rowOrRows];
+
         let prepareSaveRows = function () {
-            let insertRow = prepareInsertRows(rowRaw);
+            let insertRow = prepareInsertRows(rows);
             let setValues = [];
-            let setSQL = _.map(rowRaw, function (val, key) {
-                setValues.push(key, val);
-                return '?? = ?';
+
+            let setSQL = _.map(_.first(rows), function (val, key) {
+                setValues.push(key, key);
+                return '?? = VALUES(??)';
             }).join(', ');
 
             return {
