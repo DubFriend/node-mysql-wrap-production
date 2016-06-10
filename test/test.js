@@ -230,8 +230,29 @@ describe('mysqlWrap', function () {
                     resultsPerPage: 2
                 }
             })
-            .then(function (rows) {
-                chai.assert.deepEqual(rows, [that.a, that.b]);
+            .then(function (resp) {
+                chai.assert.deepEqual(_.omit(resp, 'results'), {
+                    resultCount: 3,
+                    pageCount: 2,
+                    currentPage: 1
+                });
+                chai.assert.sameDeepMembers(resp.results, [that.a, that.b]);
+                done();
+            })
+            .done();
+        });
+
+        it('should have option to include result count', function (done) {
+            let that = this;
+            that.sql.query({
+                sql: 'SELECT * FROM `table` LIMIT 2',
+                resultCount: true
+            })
+            .then(function (resp) {
+                chai.assert.deepEqual(_.omit(resp, 'results'), {
+                    resultCount: 3
+                });
+                chai.assert.sameDeepMembers(resp.results, [that.a, that.b]);
                 done();
             })
             .done();

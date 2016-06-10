@@ -20,6 +20,12 @@ let createMySQLWrap = function (poolCluster, options) {
             'OFFSET ' + ((fig.page - 1) * fig.resultsPerPage) : '';
     };
 
+    let addCalcFoundRows = function (sql) {
+        let pieces = sql.split(' ');
+        pieces.splice(1, 0, 'SQL_CALC_FOUND_ROWS');
+        return pieces.join(' ');
+    };
+
     let getStatementObject = function (statementOrObject) {
         let statement = _.isObject(statementOrObject) ?
             statementOrObject : {
@@ -28,8 +34,13 @@ let createMySQLWrap = function (poolCluster, options) {
             };
 
         if(statement.paginate) {
-            statement.sql = stripLimit(statement.sql) + ' ' +
-                            paginateLimit(statement.paginate);
+            statement.sql = addCalcFoundRows(
+                stripLimit(statement.sql) + ' ' +
+                paginateLimit(statement.paginate)
+            );
+        }
+        else if(statement.resultCount) {
+            statement.sql = addCalcFoundRows(statement.sql);
         }
 
         return statement;
@@ -120,11 +131,37 @@ let createMySQLWrap = function (poolCluster, options) {
         .then(function (conn) {
             return Q.Promise(function (resolve, reject) {
                 conn.query(statementObject, values || [], function (err, rows) {
-                    conn && conn.release && conn.release();
                     if(err) {
+                        conn.release();
                         reject(err);
                     }
+                    else if (statementObject.paginate || statementObject.resultCount) {
+                        conn.query('SELECT FOUND_ROWS() AS count', function (err, result) {
+                            conn.release();
+                            if(err) {
+                                reject(err);
+                            }
+                            else if(statementObject.paginate){
+                                resolve({
+                                    resultCount: _.first(result).count,
+                                    pageCount: Math.ceil(
+                                        _.first(result).count /
+                                        statementObject.paginate.resultsPerPage
+                                    ),
+                                    currentPage: statementObject.paginate.page,
+                                    results: rows
+                                });
+                            }
+                            else if(statementObject.resultCount) {
+                                resolve({
+                                    resultCount: _.first(result).count,
+                                    results: rows
+                                });
+                            }
+                        });
+                    }
                     else {
+                        conn.release();
                         resolve(rows);
                     }
                 });
