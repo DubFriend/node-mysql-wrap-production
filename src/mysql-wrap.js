@@ -300,6 +300,9 @@ let createMySQLWrap = function (poolCluster, options) {
         return self.query('DELETE FROM ?? ' + where.sql, values);
     };
 
+    self.escape = poolCluster.escape;
+    self.escapeId = poolCluster.escapeId;
+
     return self;
 };
 
