@@ -53,9 +53,34 @@ describe('mysqlWrap', function () {
 
     describe('build', function () {
         it('should return query generator', function (done) {
-            this.sql.build().select().from('table').where('field = ?', 'bar').run()
+            this.sql.build().select().from('table')
+            .where('field = ?', this.b.field).run()
             .then(resp => {
                 chai.assert.deepEqual(resp, [this.b]);
+                done();
+            }).done();
+        });
+
+        it('should be able to pass query options through "run" command', function (done) {
+            this.sql.build().select().from('table')
+            .where('id = ?', this.b.id).run({ resultCount: true })
+            .then(resp => {
+                chai.assert.deepEqual(
+                    resp,
+                    {
+                        resultCount: 1,
+                        results: [this.b]
+                    }
+                );
+                done();
+            }).done();
+        });
+
+        it('should be invokable through a "one" command', function (done) {
+            this.sql.build().select().from('table')
+            .where('id = ?', this.b.id).one()
+            .then(resp => {
+                chai.assert.deepEqual(resp, this.b);
                 done();
             }).done();
         });

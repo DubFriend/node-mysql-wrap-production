@@ -136,9 +136,20 @@ let createMySQLWrap = function (poolCluster, options) {
                     autoQuoteFieldNames: true
                 });
 
-                s.run = () => {
+                s.run = fig => {
                     let p = s.toParam();
-                    return self.query(p.text, p.values);
+                    return self.query(
+                        _.extend({ sql: p.text }, fig || {}),
+                        p.values
+                    );
+                };
+
+                s.one = fig => {
+                    let p = s.toParam();
+                    return self.one(
+                        _.extend({ sql: p.text }, fig || {}),
+                        p.values
+                    );
                 };
 
                 return s;
