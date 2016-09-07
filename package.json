@@ -1,6 +1,6 @@
 {
   "name": "mysql-wrap-production",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Mysql interface and helper functions, wrapping node-mysql",
   "main": "src/mysql-wrap.js",
   "scripts": {
@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "lodash": "^3.10.1",
-    "q": "^1.4.1"
+    "q": "^1.4.1",
+    "squel": "^5.4.2"
   }
 }

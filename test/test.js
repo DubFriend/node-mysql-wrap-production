@@ -1,11 +1,11 @@
 'use strict';
 
-let _ = require('lodash');
-let Q = require('q');
-let chai = require('chai');
-let config = require('../config');
-let mysql = require('mysql');
-let createNodeMySQL = require('../src/mysql-wrap');
+const _ = require('lodash');
+const Q = require('q');
+const chai = require('chai');
+const config = require('../config');
+const mysql = require('mysql');
+const createNodeMySQL = require('../src/mysql-wrap');
 
 describe('mysqlWrap', function () {
     before(function (done) {
@@ -48,6 +48,16 @@ describe('mysqlWrap', function () {
                     );
                 }
             );
+        });
+    });
+
+    describe('build', function () {
+        it('should return query generator', function (done) {
+            this.sql.build().select().from('table').where('field = ?', 'bar').run()
+            .then(resp => {
+                chai.assert.deepEqual(resp, [this.b]);
+                done();
+            }).done();
         });
     });
 

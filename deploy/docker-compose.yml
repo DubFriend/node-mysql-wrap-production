@@ -1,0 +1,12 @@
+mysql:
+  container_name: mysql
+  image: mysql:5.6
+  ports:
+    - "3306:3306"
+  environment:
+    - MYSQL_USER=username
+    - MYSQL_PASSWORD=password
+    - MYSQL_ROOT_PASSWORD=password
+  volumes:
+    - ./install.sql:/docker-entrypoint-initdb.d/install.sql
+  restart: always

@@ -1,13 +1,17 @@
 'use strict';
 
-let _ = require('lodash');
-let Q = require('q');
+const _ = require('lodash');
+const Q = require('q');
+const squel = require('squel');
 
 Q.longStackSupport = true;
 
 let createMySQLWrap = function (poolCluster, options) {
     options = options || {};
 
+    // let self = function () {
+    //     console.log('called');
+    // };
     let self = {};
 
     let stripLimit = function (sql) {
@@ -122,6 +126,33 @@ let createMySQLWrap = function (poolCluster, options) {
 
     let isSQLReadOrWrite = function (statementRaw) {
         return /^SELECT/i.test(statementRaw.trim()) ? 'read' : 'write';
+    };
+
+    self.build = () => {
+        const wrap = method => {
+            return () => {
+                let s = squel[method]({
+                    autoQuoteTableNames: true,
+                    autoQuoteFieldNames: true
+                });
+
+                s.run = () => {
+                    let p = s.toParam();
+                    return self.query(p.text, p.values);
+                };
+
+                return s;
+            };
+        };
+
+        let buildSelf = {
+            select: wrap('select'),
+            update: wrap('update'),
+            delete: wrap('delete'),
+            insert: wrap('insert')
+        };
+
+        return buildSelf;
     };
 
     self.query = function (statementRaw, values) {

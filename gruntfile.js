@@ -1,10 +1,7 @@
 module.exports = function (grunt) {
     grunt.initConfig({
         mochaTest: {
-            all: {
-                // options: { reporter: 'dot' },
-                src: ['test/**/*.js']
-            }
+            all: { src: ['test/**/*.js'] }
         }
     });
 
