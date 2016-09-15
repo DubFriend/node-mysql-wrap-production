@@ -9,9 +9,6 @@ Q.longStackSupport = true;
 let createMySQLWrap = function (poolCluster, options) {
     options = options || {};
 
-    // let self = function () {
-    //     console.log('called');
-    // };
     let self = {};
 
     let stripLimit = function (sql) {
@@ -131,10 +128,7 @@ let createMySQLWrap = function (poolCluster, options) {
     self.build = () => {
         const wrap = method => {
             return () => {
-                let s = squel[method]({
-                    autoQuoteTableNames: true,
-                    autoQuoteFieldNames: true
-                });
+                let s = squel[method]();
 
                 s.run = fig => {
                     let p = s.toParam();
