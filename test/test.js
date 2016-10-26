@@ -27,7 +27,7 @@ describe('mysqlWrap', () => {
             this.c = { id: 3, unique: 'c', field: 'foo' };
             this.masterConn.query(
                 'INSERT INTO `table` (`unique`, `field`) ' +
-                'VALUES ' + _.map([this.a, this.b, this.c], (row) => {
+                'VALUES ' + _.map([this.a, this.b, this.c], row => {
                     return '("' + row.unique + '", "' + row.field + '")';
                 }).join(', '),
                 (err, res) => {
@@ -122,7 +122,7 @@ describe('mysqlWrap', () => {
 
         it('should have variable parameters using "?"', done => {
             this.sql.query('SELECT * FROM `table` WHERE id = ?', [2])
-            .then((rows) => {
+            .then(rows => {
                 chai.assert.deepEqual(rows, [this.b]);
                 done();
             }).done();
@@ -130,7 +130,7 @@ describe('mysqlWrap', () => {
 
         it('should have table/field parameters using "??"', done => {
             this.sql.query('SELECT ?? FROM `table`', ['unique'])
-            .then((rows) => {
+            .then(rows => {
                 chai.assert.sameDeepMembers(rows, [
                     { unique: 'a' },
                     { unique: 'b' },
@@ -142,7 +142,7 @@ describe('mysqlWrap', () => {
 
         it('should propogate stack trace to application code', done => {
             this.sql.query('SELECT wrong FROM `table`')
-            .catch((err) => {
+            .catch(err => {
                 chai.assert.ok(/test\.js/.test(err.stack));
                 done();
             }).done();
@@ -150,7 +150,7 @@ describe('mysqlWrap', () => {
 
         it('should be case insensitive', done => {
             this.sql.query('sElEcT * FRoM `table` Where id = ?', [3])
-            .then((rows) => {
+            .then(rows => {
                 chai.assert.deepEqual(rows, [this.c]);
                 done();
             }).done();
@@ -161,7 +161,7 @@ describe('mysqlWrap', () => {
                 'INSERT INTO `table` (`unique`, `field`) ' +
                 'VALUES ("testUniqueValue", "testFieldValue")'
             )
-            .then((res) => {
+            .then(res => {
                 chai.assert.strictEqual(res.affectedRows, 1, 'affectedRows');
                 chai.assert.strictEqual(res.insertId, 4, 'insertId');
                 this.masterConn.query(
@@ -183,7 +183,7 @@ describe('mysqlWrap', () => {
                 'UPDATE `table` SET `field` = "edit" ' +
                 'WHERE `field` = "foo"'
             )
-            .then((res) => {
+            .then(res => {
                 chai.assert.strictEqual(res.affectedRows, 2, 'affectedRows');
                 chai.assert.strictEqual(res.changedRows, 2, 'changedRows');
                 this.masterConn.query(
@@ -201,7 +201,7 @@ describe('mysqlWrap', () => {
 
         it('should delete', done => {
             this.sql.query('DELETE FROM `table` WHERE `field` = "foo"')
-            .then((res) => {
+            .then(res => {
                 chai.assert.strictEqual(res.affectedRows, 2, 'affectedRows');
                 this.masterConn.query(
                     'SELECT * FROM `table` WHERE `field` = "foo"',
@@ -220,7 +220,7 @@ describe('mysqlWrap', () => {
                      'ON `table`.`field` = `table2`.`field`',
                 nestTables: true
             })
-            .then((rows) => {
+            .then(rows => {
                 chai.assert.deepEqual(rows, [{
                     table: {
                         id: 2,
@@ -244,7 +244,7 @@ describe('mysqlWrap', () => {
                     resultsPerPage: 2
                 }
             })
-            .then((resp) => {
+            .then(resp => {
                 chai.assert.deepEqual(_.omit(resp, 'results'), {
                     resultCount: 3,
                     pageCount: 2,
@@ -260,7 +260,7 @@ describe('mysqlWrap', () => {
                 sql: 'SELECT * FROM `table` LIMIT 2',
                 resultCount: true
             })
-            .then((resp) => {
+            .then(resp => {
                 chai.assert.deepEqual(_.omit(resp, 'results'), {
                     resultCount: 3
                 });
@@ -273,7 +273,7 @@ describe('mysqlWrap', () => {
     describe('one', () => {
         it('should select a single row', done => {
             this.sql.one('SELECT * FROM `table` WHERE id = 1')
-            .then((row) => {
+            .then(row => {
                 chai.assert.deepEqual(row, this.a);
                 done();
             }).done();
@@ -283,7 +283,7 @@ describe('mysqlWrap', () => {
     describe('select', () => {
         it('should select by table and basic where clause', done => {
             this.sql.select('table', { id: 3, field: 'foo' })
-            .then((rows) => {
+            .then(rows => {
                 chai.assert.deepEqual(rows, [this.c]);
                 done();
             }).done();
@@ -297,7 +297,7 @@ describe('mysqlWrap', () => {
                     resultsPerPage: 2
                 }
             })
-            .then((rows) => {
+            .then(rows => {
                 chai.assert.deepEqual(rows, [this.a , this.b]);
                 done();
             }).done();
@@ -305,7 +305,7 @@ describe('mysqlWrap', () => {
 
         it('should have option to select field', done => {
             this.sql.select({ table: 'table', fields: ['id'] })
-            .then((rows) => {
+            .then(rows => {
                 chai.assert.deepEqual(rows, [{ id: 1 }, { id: 2 }, { id: 3 }]);
                 done();
             }).done();
@@ -315,7 +315,7 @@ describe('mysqlWrap', () => {
     describe('selectOne', () => {
         it('should select single row by table and basic where clause', done => {
             this.sql.selectOne('table', { field: 'foo' })
-            .then((row) => {
+            .then(row => {
                 chai.assert.deepEqual(row, this.a);
                 done();
             }).done();
@@ -323,7 +323,7 @@ describe('mysqlWrap', () => {
 
         it('should have option to select fields', done => {
             this.sql.selectOne({ table: 'table', fields: ['id'] })
-            .then((row) => {
+            .then(row => {
                 chai.assert.deepEqual(row, { id: 1 });
                 done();
             }).done();
@@ -333,7 +333,7 @@ describe('mysqlWrap', () => {
     describe('insert', () => {
         it('should insert a single row', done => {
             this.sql.insert('table', { unique: 'd', field: 'baz' })
-            .then((res) => {
+            .then(res => {
                 chai.assert.strictEqual(res.affectedRows, 1, 'affectedRows');
                 chai.assert.strictEqual(res.insertId, 4, 'insertId');
                 this.masterConn.query(
@@ -355,7 +355,7 @@ describe('mysqlWrap', () => {
                 { unique: 'd', field: 'new' },
                 { unique: 'e', field: 'new' }
             ])
-            .then((res) => {
+            .then(res => {
                 chai.assert.strictEqual(res.affectedRows, 2, 'affectedRows');
                 chai.assert.strictEqual(res.insertId, 4, 'insertId');
                 this.masterConn.query(
@@ -375,7 +375,7 @@ describe('mysqlWrap', () => {
     describe('replace', () => {
         it('should insert row', done => {
             this.sql.replace('table', { unique: 'd', field: 'baz' })
-            .then((res) => {
+            .then(res => {
                 chai.assert.strictEqual(res.affectedRows, 1, 'affectedRows');
                 chai.assert.strictEqual(res.insertId, 4, 'insertId');
                 this.masterConn.query(
@@ -411,7 +411,7 @@ describe('mysqlWrap', () => {
     describe('save', () => {
         it('should insert row if does not exist', done => {
             this.sql.save('table', { unique: 'd', field: 'baz' })
-            .then((res) => {
+            .then(res => {
                 chai.assert.strictEqual(res.affectedRows, 1, 'returns affectedRows');
                 chai.assert.strictEqual(res.insertId, 4, 'returns insert id');
                 this.masterConn.query(
@@ -468,7 +468,7 @@ describe('mysqlWrap', () => {
     describe('update', () => {
         it('should update row', done => {
             this.sql.update('table', { field: 'edit', unique: 'd' }, { id: 1 })
-            .then((res) => {
+            .then(res => {
                 this.masterConn.query(
                     'SELECT * FROM `table`',
                     (err, res) => {
@@ -487,7 +487,7 @@ describe('mysqlWrap', () => {
     describe('delete', () => {
         it('should delete rows by where equals config', done => {
             this.sql.delete('table', { field: 'foo' })
-            .then((res) => {
+            .then(res => {
                 this.masterConn.query(
                     'SELECT * FROM `table`',
                     (err, res) => {
