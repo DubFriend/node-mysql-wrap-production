@@ -6,29 +6,25 @@ const squel = require('squel');
 
 Q.longStackSupport = true;
 
-let createMySQLWrap = function (poolCluster, options) {
+const createMySQLWrap = (poolCluster, options) => {
     options = options || {};
 
     let self = {};
 
-    let stripLimit = function (sql) {
-        return sql.replace(/ LIMIT .*/i, '');
-    };
+    const stripLimit = sql => sql.replace(/ LIMIT .*/i, '');
 
-    let paginateLimit = function (fig) {
-        return fig ?
-            'LIMIT ' + fig.resultsPerPage + ' ' +
-            'OFFSET ' + ((fig.page - 1) * fig.resultsPerPage) : '';
-    };
+    const paginateLimit = fig => fig ?
+        'LIMIT ' + fig.resultsPerPage + ' ' +
+        'OFFSET ' + ((fig.page - 1) * fig.resultsPerPage) : '';
 
-    let addCalcFoundRows = function (sql) {
-        let pieces = sql.split(' ');
+    const addCalcFoundRows = sql => {
+        const pieces = sql.split(' ');
         pieces.splice(1, 0, 'SQL_CALC_FOUND_ROWS');
         return pieces.join(' ');
     };
 
-    let getStatementObject = function (statementOrObject) {
-        let statement = _.isObject(statementOrObject) ?
+    const getStatementObject = statementOrObject => {
+        const statement = _.isObject(statementOrObject) ?
             statementOrObject : {
                 sql: statementOrObject,
                 nestTables: false
@@ -47,9 +43,9 @@ let createMySQLWrap = function (poolCluster, options) {
         return statement;
     };
 
-    let prepareWhereEquals = function (whereEquals) {
-        let values = [];
-        let sql = _.map(whereEquals, function (val, key) {
+    const prepareWhereEquals = whereEquals => {
+        const values = [];
+        const sql = _.map(whereEquals, (val, key) => {
             values.push(key, val);
             return '?? = ?';
         }, '').join(' AND ');
@@ -60,58 +56,40 @@ let createMySQLWrap = function (poolCluster, options) {
         };
     };
 
-    let getConnection = function (readOrWrite) {
-        return Q.Promise(function (resolve, reject) {
-            if(options.replication) {
-                poolCluster.getConnection(
-                    options.replication[readOrWrite],
-                    function (err, conn) {
-                        if(err) {
-                            reject(err);
-                        }
-                        else {
-                            resolve(conn);
-                        }
-                    }
-                );
-            }
-            else {
-                poolCluster.getConnection(function (err, conn) {
-                    if(err) {
-                        reject(err);
-                    }
-                    else {
-                        resolve(conn);
-                    }
-                });
-            }
-        });
-    };
+    const getConnection = readOrWrite => Q.Promise((resolve, reject) => {
+        if(options.replication) {
+            poolCluster.getConnection(
+                options.replication[readOrWrite],
+                (err, conn) => err ? reject(err) : resolve(conn)
+            );
+        }
+        else {
+            poolCluster.getConnection(
+                (err, conn) => err ? reject(err) : resolve(conn)
+            );
+        }
+    });
 
-    let selectedFieldsSQL = function (fields) {
-        return fields ? fields.join(', ') : '*';
-    };
+    const selectedFieldsSQL = fields => fields ? fields.join(', ') : '*';
 
-    let prepareInsertRows = function (rowOrRows) {
-        let values = [];
-        let fields = _.isArray(rowOrRows) ?
+    const prepareInsertRows = rowOrRows => {
+        const values = [];
+        const fields = _.isArray(rowOrRows) ?
             _.keys(_.first(rowOrRows)) : _.keys(rowOrRows);
 
         // NOTE: It is important that fieldsSQL is generated before valuesSQL
         // (because the order of the values array would otherwise be incorrect)
-        let fieldsSQL = '(' + _.map(fields, function (field) {
+        const fieldsSQL = '(' + _.map(fields, field => {
             values.push(field);
             return '??';
         }).join(', ') + ')';
 
-        let processValuesSQL = function (row) {
-            return '(' + _.map(fields, function (field) {
-                values.push(row[field]);
-                return '?';
-            }) + ')';
-        };
+        const processValuesSQL = row => '(' + _.map(fields, field => {
+            values.push(row[field]);
+            return '?';
+        }) + ')';
 
-        let valuesSQL = _.isArray(rowOrRows) ?
+        const valuesSQL = _.isArray(rowOrRows) ?
             _.map(rowOrRows, processValuesSQL).join(', ') :
             processValuesSQL(rowOrRows);
 
@@ -121,33 +99,30 @@ let createMySQLWrap = function (poolCluster, options) {
         };
     };
 
-    let isSQLReadOrWrite = function (statementRaw) {
-        return /^SELECT/i.test(statementRaw.trim()) ? 'read' : 'write';
-    };
+    const isSQLReadOrWrite = statementRaw => /^SELECT/i.test(statementRaw.trim()) ?
+        'read' : 'write';
 
     self.build = () => {
-        const wrap = method => {
-            return () => {
-                let s = squel[method]();
+        const wrap = method => () => {
+            const s = squel[method]();
 
-                s.run = fig => {
-                    let p = s.toParam();
-                    return self.query(
-                        _.extend({ sql: p.text }, fig || {}),
-                        p.values
-                    );
-                };
-
-                s.one = fig => {
-                    let p = s.toParam();
-                    return self.one(
-                        _.extend({ sql: p.text }, fig || {}),
-                        p.values
-                    );
-                };
-
-                return s;
+            s.run = fig => {
+                const p = s.toParam();
+                return self.query(
+                    _.extend({ sql: p.text }, fig || {}),
+                    p.values
+                );
             };
+
+            s.one = fig => {
+                const p = s.toParam();
+                return self.one(
+                    _.extend({ sql: p.text }, fig || {}),
+                    p.values
+                );
+            };
+
+            return s;
         };
 
         let buildSelf = {
@@ -160,87 +135,81 @@ let createMySQLWrap = function (poolCluster, options) {
         return buildSelf;
     };
 
-    self.query = function (statementRaw, values) {
-        let statementObject = getStatementObject(statementRaw);
+    self.query = (statementRaw, values) => {
+        const statementObject = getStatementObject(statementRaw);
 
         return getConnection(isSQLReadOrWrite(statementObject.sql))
-        .then(function (conn) {
-            return Q.Promise(function (resolve, reject) {
-                conn.query(statementObject, values || [], function (err, rows) {
-                    if(err) {
+        .then((conn) => Q.Promise((resolve, reject) => {
+            conn.query(statementObject, values || [], (err, rows) => {
+                if(err) {
+                    conn.release();
+                    reject(err);
+                }
+                else if (statementObject.paginate || statementObject.resultCount) {
+                    conn.query('SELECT FOUND_ROWS() AS count', (err, result) => {
                         conn.release();
-                        reject(err);
-                    }
-                    else if (statementObject.paginate || statementObject.resultCount) {
-                        conn.query('SELECT FOUND_ROWS() AS count', function (err, result) {
-                            conn.release();
-                            if(err) {
-                                reject(err);
-                            }
-                            else if(statementObject.paginate){
-                                resolve({
-                                    resultCount: _.first(result).count,
-                                    pageCount: Math.ceil(
-                                        _.first(result).count /
-                                        statementObject.paginate.resultsPerPage
-                                    ),
-                                    currentPage: statementObject.paginate.page,
-                                    results: rows
-                                });
-                            }
-                            else if(statementObject.resultCount) {
-                                resolve({
-                                    resultCount: _.first(result).count,
-                                    results: rows
-                                });
-                            }
-                        });
-                    }
-                    else {
-                        conn.release();
-                        resolve(rows);
-                    }
-                });
+                        if(err) {
+                            reject(err);
+                        }
+                        else if(statementObject.paginate){
+                            resolve({
+                                resultCount: _.first(result).count,
+                                pageCount: Math.ceil(
+                                    _.first(result).count /
+                                    statementObject.paginate.resultsPerPage
+                                ),
+                                currentPage: statementObject.paginate.page,
+                                results: rows
+                            });
+                        }
+                        else if(statementObject.resultCount) {
+                            resolve({
+                                resultCount: _.first(result).count,
+                                results: rows
+                            });
+                        }
+                    });
+                }
+                else {
+                    conn.release();
+                    resolve(rows);
+                }
             });
-        });
+        }));
     };
 
-    self.queryStream = function (statementRaw, values) {
-        let statementObject = getStatementObject(statementRaw);
+    self.queryStream = (statementRaw, values) => {
+        const statementObject = getStatementObject(statementRaw);
 
         return getConnection(isSQLReadOrWrite(statementObject.sql))
-        .then(function (conn) {
-            let stream = conn.query(statementObject, values || []).stream();
+        .then(conn => {
+            const stream = conn.query(statementObject, values || []).stream();
 
             stream.on('error', err => {
                 console.error(err);
                 conn && conn.release && conn.release();
             });
 
-            stream.on('end', () => {
-                conn && conn.release && conn.release();
-            });
+            stream.on('end', () => conn && conn.release && conn.release());
 
             return stream;
         });
     };
 
-    self.one = function (statementRaw, values) {
-        let statementObject = getStatementObject(statementRaw);
+    self.one = (statementRaw, values) => {
+        const statementObject = getStatementObject(statementRaw);
         statementObject.sql = stripLimit(statementObject.sql) + ' LIMIT 1';
 
         return self.query(statementObject, values)
-        .then(function (rows) {
-            return _.first(rows) || null;
-        });
+        .then(rows => _.first(rows) || null);
     };
 
-    let buildSelect = function (tableRaw, whereEquals) {
-        let statementObject = _.isObject(tableRaw) ?
+    const buildSelect = (tableRaw, whereEquals) => {
+        const statementObject = _.isObject(tableRaw) ?
             tableRaw : { table: tableRaw };
-        let where = prepareWhereEquals(whereEquals);
-        let values = [statementObject.table].concat(where.values);
-        let sql = 'SELECT ' + selectedFieldsSQL(statementObject.fields) + ' ' +
+        const where = prepareWhereEquals(whereEquals);
+        const values = [statementObject.table].concat(where.values);
+        const sql = 'SELECT ' + selectedFieldsSQL(statementObject.fields) + ' ' +
         'FROM ?? ' + where.sql + (
             statementObject.paginate ?
                 ' ' + paginateLimit(statementObject.paginate) : ''
@@ -249,21 +218,21 @@ let createMySQLWrap = function (poolCluster, options) {
         return { sql: sql, values: values };
     };
 
-    self.select = function (tableRaw, whereEquals) {
-        let query = buildSelect(tableRaw, whereEquals);
+    self.select = (tableRaw, whereEquals) => {
+        const query = buildSelect(tableRaw, whereEquals);
         return self.query(query.sql, query.values);
     };
 
-    self.selectStream = function (tableRaw, whereEquals) {
-        let query = buildSelect(tableRaw, whereEquals);
+    self.selectStream = (tableRaw, whereEquals) => {
+        const query = buildSelect(tableRaw, whereEquals);
         return self.queryStream(query.sql, query.values);
     };
 
-    self.selectOne = function (tableRaw, whereEquals) {
-        let statementObject = _.isObject(tableRaw) ?
+    self.selectOne = (tableRaw, whereEquals) => {
+        const statementObject = _.isObject(tableRaw) ?
             tableRaw : { table: tableRaw };
-        let where = prepareWhereEquals(whereEquals);
-        let values = [statementObject.table].concat(where.values);
+        const where = prepareWhereEquals(whereEquals);
+        const values = [statementObject.table].concat(where.values);
 
         return self.one(
             'SELECT ' + selectedFieldsSQL(statementObject.fields) +
@@ -272,30 +241,30 @@ let createMySQLWrap = function (poolCluster, options) {
         );
     };
 
-    self.insert = function (table, rowOrRows) {
-        let rows = prepareInsertRows(rowOrRows);
+    self.insert = (table, rowOrRows) => {
+        const rows = prepareInsertRows(rowOrRows);
         return self.query(
             'INSERT INTO ?? ' + rows.sql,
             [table].concat(rows.values)
         );
     };
 
-    self.replace = function (table, rowRaw, callback) {
-        let row = prepareInsertRows(rowRaw);
+    self.replace = (table, rowRaw, callback) => {
+        const row = prepareInsertRows(rowRaw);
         return self.query(
             'REPLACE INTO ?? ' + row.sql,
             [table].concat(row.values)
         );
     };
 
-    self.save = function (table, rowOrRows) {
-        let rows = _.isArray(rowOrRows) ? rowOrRows : [rowOrRows];
+    self.save = (table, rowOrRows) => {
+        const rows = _.isArray(rowOrRows) ? rowOrRows : [rowOrRows];
 
-        let prepareSaveRows = function () {
-            let insertRow = prepareInsertRows(rows);
-            let setValues = [];
+        const prepareSaveRows = () => {
+            const insertRow = prepareInsertRows(rows);
+            const setValues = [];
 
-            let setSQL = _.map(_.first(rows), function (val, key) {
+            const setSQL = _.map(_.first(rows), (val, key) => {
                 setValues.push(key, key);
                 return '?? = VALUES(??)';
             }).join(', ');
@@ -306,7 +275,7 @@ let createMySQLWrap = function (poolCluster, options) {
             };
         };
 
-        let row = prepareSaveRows();
+        const row = prepareSaveRows();
 
         return self.query(
             'INSERT INTO ?? ' + row.sql,
@@ -314,25 +283,25 @@ let createMySQLWrap = function (poolCluster, options) {
         );
     };
 
-    self.update = function (table, setData, whereEquals) {
-        let prepareSetRows = function (setData) {
-            let values = [];
-            let sql = ' SET ' + _.map(setData, function (val, key) {
+    self.update = (table, setData, whereEquals) => {
+        const prepareSetRows = setData => {
+            const values = [];
+            const sql = ' SET ' + _.map(setData, (val, key) => {
                 values.push(key, val);
                 return '?? = ?';
             }).join(', ');
             return { values: values, sql: sql };
         };
 
-        let set = prepareSetRows(setData);
-        let where = prepareWhereEquals(whereEquals);
-        let values = [table].concat(set.values).concat(where.values);
+        const set = prepareSetRows(setData);
+        const where = prepareWhereEquals(whereEquals);
+        const values = [table].concat(set.values).concat(where.values);
         return self.query('UPDATE ??' + set.sql + where.sql, values);
     };
 
-    self.delete = function (table, whereEquals) {
-        let where = prepareWhereEquals(whereEquals);
-        let values = [table].concat(where.values);
+    self.delete = (table, whereEquals) => {
+        const where = prepareWhereEquals(whereEquals);
+        const values = [table].concat(where.values);
         return self.query('DELETE FROM ?? ' + where.sql, values);
     };
 
