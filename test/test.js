@@ -37,9 +37,7 @@ describe('mysqlWrap', () => {
                             this.masterConn.query(
                                 'INSERT INTO `table2` (`field`) ' +
                                 'VALUES ("bar")',
-                                (err) => {
-                                    done();
-                                }
+                                err => done()
                             );
                         }
                     );
@@ -114,7 +112,7 @@ describe('mysqlWrap', () => {
     describe('query', () => {
         it('should select without values array', done => {
             this.sql.query('SELECT * FROM `table`')
-            .then((rows) => {
+            .then(rows => {
                 chai.assert.sameDeepMembers(rows, [this.a, this.b, this.c]);
                 done();
             }).done();
