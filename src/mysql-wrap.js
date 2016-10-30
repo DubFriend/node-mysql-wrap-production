@@ -276,8 +276,6 @@ const createMySQLWrap = (poolCluster, options, connection) => {
         return sql;
     });
 
-    // self.connection = () => Q(self);
-
     const finishedWithConnection = conn => {
         if(!connection) {
             conn && conn.release && conn.release();
