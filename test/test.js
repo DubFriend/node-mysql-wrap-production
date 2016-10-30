@@ -47,6 +47,23 @@ describe('mysqlWrap', () => {
         });
     });
 
+    describe('connection', () => {
+        it('should get a single connection', done => {
+            this.sql.connection()
+            .then(c => {
+                return Q.all(_.map(
+                    _.range(2),
+                    () => c.query('SELECT CONNECTION_ID()')
+                ))
+                .then(resp => {
+                    expect(resp[0]).to.deep.equal(resp[1]);
+                    c.release();
+                    done();
+                });
+            }).done();
+        });
+    });
+
     describe('build', () => {
         before(done => {
             this.rowsToEdges = (rows, fields) => _.map(rows, r => ({

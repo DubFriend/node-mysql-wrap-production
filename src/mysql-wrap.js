@@ -6,7 +6,7 @@ const squel = require('squel');
 
 Q.longStackSupport = true;
 
-const createMySQLWrap = (poolCluster, options) => {
+const createMySQLWrap = (poolCluster, options, connection) => {
     options = options || {};
 
     let self = {};
@@ -57,16 +57,21 @@ const createMySQLWrap = (poolCluster, options) => {
     };
 
     const getConnection = readOrWrite => Q.Promise((resolve, reject) => {
-        if(options.replication) {
-            poolCluster.getConnection(
-                options.replication[readOrWrite],
-                (err, conn) => err ? reject(err) : resolve(conn)
-            );
+        if(connection) {
+            resolve(connection);
         }
         else {
-            poolCluster.getConnection(
-                (err, conn) => err ? reject(err) : resolve(conn)
-            );
+            if(options.replication) {
+                poolCluster.getConnection(
+                    options.replication[readOrWrite],
+                    (err, conn) => err ? reject(err) : resolve(conn)
+                );
+            }
+            else {
+                poolCluster.getConnection(
+                    (err, conn) => err ? reject(err) : resolve(conn)
+                );
+            }
         }
     });
 
@@ -264,14 +269,29 @@ const createMySQLWrap = (poolCluster, options) => {
         return buildSelf;
     };
 
+    self.connection = () => getConnection('write')
+    .then(conn => {
+        let sql = createMySQLWrap(null, options, conn);
+        sql.release = () => conn && conn.release && conn.release();
+        return sql;
+    });
+
+    // self.connection = () => Q(self);
+
+    const finishedWithConnection = conn => {
+        if(!connection) {
+            conn && conn.release && conn.release();
+        }
+    };
+
     self.query = (statementRaw, values) => {
         const statementObject = getStatementObject(statementRaw);
 
         return getConnection(isSQLReadOrWrite(statementObject.sql))
-        .then((conn) => Q.Promise((resolve, reject) => {
+        .then(conn => Q.Promise((resolve, reject) => {
             conn.query(statementObject, values || [], (err, rows) => {
                 if(err) {
-                    conn.release();
+                    finishedWithConnection(conn);
                     reject(err);
                 }
                 else if (
@@ -279,7 +299,7 @@ const createMySQLWrap = (poolCluster, options) => {
                     statementObject.resultCount
                 ) {
                     conn.query('SELECT FOUND_ROWS() AS count', (err, result) => {
-                        conn.release();
+                        finishedWithConnection(conn);
                         if(err) {
                             reject(err);
                         }
@@ -303,7 +323,7 @@ const createMySQLWrap = (poolCluster, options) => {
                     });
                 }
                 else {
-                    conn.release();
+                    finishedWithConnection(conn);
                     resolve(rows);
                 }
             });
@@ -319,10 +339,10 @@ const createMySQLWrap = (poolCluster, options) => {
 
             stream.on('error', err => {
                 console.error(err);
-                conn && conn.release && conn.release();
+                finishedWithConnection(conn);
             });
 
-            stream.on('end', () => conn && conn.release && conn.release());
+            stream.on('end', () => finishedWithConnection(conn));
 
             return stream;
         });
