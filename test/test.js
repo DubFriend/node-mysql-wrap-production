@@ -3,6 +3,7 @@
 const _ = require('lodash');
 const Q = require('q');
 const chai = require('chai');
+const expect = require('chai').expect;
 const config = require('../config');
 const mysql = require('mysql');
 const createNodeMySQL = require('../src/mysql-wrap');
@@ -47,6 +48,356 @@ describe('mysqlWrap', () => {
     });
 
     describe('build', () => {
+        before(done => {
+            this.rowsToEdges = (rows, fields) => _.map(rows, r => ({
+                node: r,
+                cursor: this.toCursor(r, fields || ['id'])
+            }));
+
+            this.toCursor = (r, fields) => new Buffer(_.map(
+                _.isArray(fields) ? fields : [fields],
+                f => String(r[f])
+            ).join('#')).toString('base64');
+
+            this.cursorFig = od => ({
+                cursor: _.extend({ orderBy: 'id' }, od)
+            });
+
+            done();
+        });
+
+        it('should have cursor option', done => {
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                first: 100
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 3,
+                    pageInfo: {
+                        hasNextPage: false,
+                        hasPreviousPage: false
+                    },
+                    edges: this.rowsToEdges([this.a, this.b, this.c])
+                });
+                done();
+            }).done();
+        });
+
+        it('should handle orderBy with direction', done => {
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                first: 100,
+                orderBy: { field: 'id', direction: 'DESC' }
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 3,
+                    pageInfo: {
+                        hasNextPage: false,
+                        hasPreviousPage: false
+                    },
+                    edges: this.rowsToEdges([this.c, this.b, this.a])
+                });
+                done();
+            }).done();
+        });
+
+        it('should handle orderBy with serialization', done => {
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                first: 100,
+                orderBy: {
+                    field: 'id',
+                    serialize: v => String(v + 1)
+                }
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 3,
+                    pageInfo: {
+                        hasNextPage: false,
+                        hasPreviousPage: false
+                    },
+                    edges: _.map(
+                        [this.a, this.b, this.c],
+                        r => ({
+                            node: r,
+                            cursor: this.toCursor({ id: r.id + 1 }, 'id')
+                        })
+                    )
+                });
+                done();
+            }).done();
+        });
+
+        it('should handle orderBy with deserialization', done => {
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                first: 100,
+                after: this.toCursor(this.a, 'id'),
+                orderBy: {
+                    field: 'id',
+                    deserialize: v => Number(v) + 1
+                }
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 1,
+                    pageInfo: {
+                        hasNextPage: false,
+                        hasPreviousPage: false
+                    },
+                    edges: this.rowsToEdges([this.c])
+                });
+                done();
+            }).done();
+        });
+
+        it('should limit with "first" field', done => {
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                first: 1
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 3,
+                    pageInfo: {
+                        hasNextPage: true,
+                        hasPreviousPage: false
+                    },
+                    edges: this.rowsToEdges([this.a])
+                });
+                done();
+            }).done();
+        });
+
+        it('should limit with the "last" field', done => {
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                last: 1
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 3,
+                    pageInfo: {
+                        hasNextPage: false,
+                        hasPreviousPage: true
+                    },
+                    edges: this.rowsToEdges([this.c])
+                });
+                done();
+            }).done();
+        });
+
+        it('should enable next page selection with the "after" field', done => {
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                first: 100,
+                after: this.toCursor(this.a, 'id')
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 2,
+                    pageInfo: {
+                        hasNextPage: false,
+                        hasPreviousPage: false
+                    },
+                    edges: this.rowsToEdges([this.b, this.c])
+                });
+                done();
+            }).done();
+        });
+
+        it('should enable previous page selection with the "before" field', done => {
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                last: 100,
+                before: this.toCursor(this.c, 'id')
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 2,
+                    pageInfo: {
+                        hasNextPage: false,
+                        hasPreviousPage: false
+                    },
+                    edges: this.rowsToEdges([this.a, this.b])
+                });
+                done();
+            }).done();
+        });
+
+        it('should limit with "first" and "after"', done => {
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                first: 1,
+                after: this.toCursor(this.a, 'id')
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 2,
+                    pageInfo: {
+                        hasNextPage: true,
+                        hasPreviousPage: false
+                    },
+                    edges: this.rowsToEdges([this.b])
+                });
+                done();
+            }).done();
+        });
+
+        it('should limit with "last" and "after"', done => {
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                last: 1,
+                after: this.toCursor(this.a, 'id')
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 2,
+                    pageInfo: {
+                        hasNextPage: false,
+                        hasPreviousPage: true
+                    },
+                    edges: this.rowsToEdges([this.c])
+                });
+                done();
+            }).done();
+        });
+
+        it('should limit with "first" and "before"', done => {
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                first: 1,
+                before: this.toCursor(this.c, 'id')
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 2,
+                    pageInfo: {
+                        hasNextPage: true,
+                        hasPreviousPage: false
+                    },
+                    edges: this.rowsToEdges([this.a])
+                });
+                done();
+            }).done();
+        });
+
+        it('should limit with "last" and "before"', done => {
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                last: 1,
+                before: this.toCursor(this.c, 'id')
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 2,
+                    pageInfo: {
+                        hasNextPage: false,
+                        hasPreviousPage: true
+                    },
+                    edges: this.rowsToEdges([this.b])
+                });
+                done();
+            }).done();
+        });
+
+        it('should handle compound orderBy', done => {
+            const orderBy = ['field', 'id'];
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                orderBy: orderBy,
+                first: 100
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 3,
+                    pageInfo: {
+                        hasNextPage: false,
+                        hasPreviousPage: false
+                    },
+                    edges: this.rowsToEdges([this.b, this.a, this.c], orderBy)
+                });
+                done();
+            }).done();
+        });
+
+        it('should handle compound orderBy with direction', done => {
+            const orderBy = [
+                { field: 'field' },
+                { field: 'id', direction: 'DESC' }
+            ];
+
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                orderBy: orderBy,
+                first: 100
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 3,
+                    pageInfo: {
+                        hasNextPage: false,
+                        hasPreviousPage: false
+                    },
+                    edges: this.rowsToEdges(
+                        [this.b, this.c, this.a],
+                        _.map(orderBy, o => o.field)
+                    )
+                });
+                done();
+            }).done();
+        });
+
+        it('should handle compound orderBy with complex fig', done => {
+            const orderBy = ['field', 'id'];
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                orderBy: ['field', 'id'],
+                first: 2,
+                before: this.toCursor(this.c, orderBy),
+                after: this.toCursor(this.b, orderBy)
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 1,
+                    pageInfo: {
+                        hasNextPage: false,
+                        hasPreviousPage: false
+                    },
+                    edges: this.rowsToEdges([this.a], orderBy)
+                });
+                done();
+            }).done();
+        });
+
+        it('should handle compound orderBy with complex fig with direction', done => {
+            const orderBy = [
+                { field: 'field' },
+                { field: 'id', direction: 'DESC' }
+            ];
+            this.sql.build().select().from('`table`').run(this.cursorFig({
+                orderBy: orderBy,
+                first: 2,
+                before: this.toCursor(this.a, _.map(orderBy, o => o.field))
+            }))
+            .then(resp => {
+                expect(resp).to.deep.equal({
+                    resultCount: 2,
+                    pageInfo: {
+                        hasNextPage: false,
+                        hasPreviousPage: false
+                    },
+                    edges: this.rowsToEdges(
+                        [this.b, this.c],
+                        _.map(orderBy, o => o.field)
+                    )
+                });
+                done();
+            }).done();
+        });
+
+        it('should have whereIfDefined method', done => {
+            this.sql.build().select().from('`table`')
+            .whereIfDefined('id = ?', undefined).run()
+            .then(resp => {
+                expect(resp).to.have.deep.members([this.a, this.b, this.c]);
+                return this.sql.build().select().from('`table`')
+                .whereIfDefined('id = ?', 0).run();
+            })
+            .then(resp => {
+                expect(resp).to.deep.equal([]);
+                done();
+            }).done();
+        });
+
         it('should return query generator', done => {
             this.sql.build().select().from('`table`')
             .where('field = ?', this.b.field).run()

@@ -102,16 +102,138 @@ const createMySQLWrap = (poolCluster, options) => {
     const isSQLReadOrWrite = statementRaw => /^SELECT/i.test(statementRaw.trim()) ?
         'read' : 'write';
 
+    const runCursor = (q, fig) => {
+        const orderBy = _.map(
+            _.isArray(fig.orderBy) ? fig.orderBy : [fig.orderBy],
+            o =>  _.isString(o) ?
+                { field: o, isAscending: true } :
+                _.extend(
+                    _.omit(_.clone(o), 'direction'),
+                    { isAscending: o.direction === 'DESC' ? false : true }
+                )
+        );
+
+        const isAscending = fig.last && !fig.first ? false : true;
+        const delimeter = '#';
+
+        const decodeCursor = c => _.map(
+            new Buffer(c, 'base64')
+            .toString('ascii').split(delimeter),
+            (v, i) => orderBy[i].deserialize ? orderBy[i].deserialize(v) : v
+        );
+
+        const encodeCursor = r => new Buffer(_.map(
+            orderBy,
+            o => o.serialize ? o.serialize(r[o.field]) : String(r[o.field])
+        ).join(delimeter)).toString('base64');
+
+        const buildWhereArgs = (values, isGreaterThan) => {
+            const build = (values, orderBy, isGreaterThan) => {
+                const sql = _.map(
+                    orderBy,
+                    (o, i) => i === values.length - 1 ?
+                        `${o.field} ${
+                            (o.isAscending ? isGreaterThan : !isGreaterThan) ?
+                                '>' : '<'
+                        } ?` :
+                        `${o.field} = ?`
+                ).join(' AND ');
+
+                let sqls = [sql];
+                let mappedValues = [values];
+
+                if(values.length > 1) {
+                    const w = build(
+                        _.initial(values),
+                        _.initial(orderBy),
+                        isGreaterThan
+                    );
+                    sqls = sqls.concat(w.sqls);
+                    mappedValues = mappedValues.concat(w.mappedValues);
+                }
+
+                return {
+                    sqls: sqls,
+                    mappedValues: mappedValues
+                };
+            };
+
+            const w = build(values, orderBy, isGreaterThan);
+
+            return [w.sqls.reverse().join(' OR ')]
+                .concat(_.flatten(w.mappedValues.reverse()));
+        };
+
+        _.each(orderBy, o => {
+            q.order(
+                o.field,
+                o.isAscending ? isAscending : !isAscending
+            );
+        });
+
+        if(fig.after) {
+            q.where.apply(q, buildWhereArgs(decodeCursor(fig.after), true));
+        }
+
+        if(fig.before) {
+            q.where.apply(q, buildWhereArgs(decodeCursor(fig.before), false));
+        }
+
+        q.limit(isAscending ? fig.first : fig.last);
+
+        const query = q.toParam();
+
+        return self.query({
+            sql: query.text,
+            resultCount: true
+        }, query.values)
+        .then(resp => {
+            if(isAscending && fig.last && fig.last < resp.results.length) {
+                resp.results = resp.results.slice(
+                    resp.results.length - fig.last,
+                    resp.results.length
+                );
+            }
+            else if(!isAscending && fig.last && fig.last < resp.results.length) {
+                resp.results = resp.results.slice(0, fig.last);
+            }
+
+            if(!isAscending) {
+                resp.results = resp.results.reverse();
+            }
+
+            return resp;
+        })
+        .then(resp => ({
+            resultCount: resp.resultCount,
+            pageInfo: {
+                hasPreviousPage: fig.last ? resp.resultCount > fig.last : false,
+                hasNextPage: fig.first ? resp.resultCount > fig.first : false
+            },
+            edges: _.map(
+                resp.results,
+                r => ({ node: r, cursor: encodeCursor(r) })
+            )
+        }));
+    };
+
     self.build = () => {
         const wrap = method => () => {
             const s = squel[method]();
 
+
             s.run = fig => {
-                const p = s.toParam();
-                return self.query(
-                    _.extend({ sql: p.text }, fig || {}),
-                    p.values
-                );
+                fig = fig || {};
+                if(fig.cursor) {
+                    return runCursor(s, fig.cursor);
+                }
+                else {
+                    const p = s.toParam();
+                    return self.query(
+                        _.extend({ sql: p.text }, fig),
+                        p.values
+                    );
+                }
             };
 
             s.one = fig => {
@@ -120,6 +242,13 @@ const createMySQLWrap = (poolCluster, options) => {
                     _.extend({ sql: p.text }, fig || {}),
                     p.values
                 );
+            };
+
+            s.whereIfDefined = (sql, value) => {
+                if(value !== undefined) {
+                    s.where(sql, value);
+                }
+                return s;
             };
 
             return s;
@@ -145,7 +274,10 @@ const createMySQLWrap = (poolCluster, options) => {
                     conn.release();
                     reject(err);
                 }
-                else if (statementObject.paginate || statementObject.resultCount) {
+                else if (
+                    statementObject.paginate ||
+                    statementObject.resultCount
+                ) {
                     conn.query('SELECT FOUND_ROWS() AS count', (err, result) => {
                         conn.release();
                         if(err) {
