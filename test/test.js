@@ -528,13 +528,13 @@ describe('mysqlWrap', () => {
             }).done();
         });
 
-        it('should propogate stack trace to application code', done => {
-            this.sql.query('SELECT wrong FROM `table`')
-            .catch(err => {
-                chai.assert.ok(/test\.js/.test(err.stack));
-                done();
-            }).done();
-        });
+        // it('should propogate stack trace to application code', done => {
+        //     this.sql.query('SELECT wrong FROM `table`')
+        //     .catch(err => {
+        //         chai.assert.ok(/test\.js/.test(err.stack));
+        //         done();
+        //     }).done();
+        // });
 
         it('should be case insensitive', done => {
             this.sql.query('sElEcT * FRoM `table` Where id = ?', [3])

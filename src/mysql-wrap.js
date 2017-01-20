@@ -4,8 +4,6 @@ const _ = require('lodash');
 const Promise = require('bluebird');
 const squel = require('squel');
 
-Promise.config({ longStackTraces: true });
-
 const createMySQLWrap = (poolCluster, options, connection) => {
     options = options || {};
 
