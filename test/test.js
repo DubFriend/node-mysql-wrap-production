@@ -1,7 +1,7 @@
 'use strict';
 
 const _ = require('lodash');
-const Q = require('q');
+const Promise = require('bluebird');
 const chai = require('chai');
 const expect = require('chai').expect;
 const config = require('../config');
@@ -51,7 +51,7 @@ describe('mysqlWrap', () => {
         it('should get a single connection', done => {
             this.sql.connection()
             .then(c => {
-                return Q.all(_.map(
+                return Promise.all(_.map(
                     _.range(2),
                     () => c.query('SELECT CONNECTION_ID()')
                 ))
@@ -218,6 +218,28 @@ describe('mysqlWrap', () => {
                 done();
             }).done();
         });
+
+        // it('should handle "after" field on derived fields', done => {
+        //     const runQuery = fig => this.sql.build().select().from('`table`')
+        //     .group('id')
+        //     .field('SUM(id)', 'idSum')
+        //     .run({
+        //         cursor: _.extend({
+        //             orderBy: [
+        //                 { field: 'idSum', isDerivedField: true }
+        //             ],
+        //             first: 100
+        //         }, fig)
+        //     });
+        //     runQuery()
+        //     .then(firstResp => {
+        //         return runQuery({ after: _.first(firstResp.edges).cursor })
+        //         .then(resp => {
+        //             expect(resp.edges).to.deep.equal(_.rest(firstResp.edges));
+        //             done();
+        //         });
+        //     }).done();
+        // });
 
         it('should enable previous page selection with the "before" field', done => {
             this.sql.build().select().from('`table`').run(this.cursorFig({

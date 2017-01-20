@@ -1,10 +1,10 @@
 'use strict';
 
 const _ = require('lodash');
-const Q = require('q');
+const Promise = require('bluebird');
 const squel = require('squel');
 
-Q.longStackSupport = true;
+Promise.config({ longStackTraces: true });
 
 const createMySQLWrap = (poolCluster, options, connection) => {
     options = options || {};
@@ -56,7 +56,7 @@ const createMySQLWrap = (poolCluster, options, connection) => {
         };
     };
 
-    const getConnection = readOrWrite => Q.Promise((resolve, reject) => {
+    const getConnection = readOrWrite => new Promise((resolve, reject) => {
         if(connection) {
             resolve(connection);
         }
@@ -286,7 +286,7 @@ const createMySQLWrap = (poolCluster, options, connection) => {
         const statementObject = getStatementObject(statementRaw);
 
         return getConnection(isSQLReadOrWrite(statementObject.sql))
-        .then(conn => Q.Promise((resolve, reject) => {
+        .then(conn => new Promise((resolve, reject) => {
             conn.query(statementObject, values || [], (err, rows) => {
                 if(err) {
                     finishedWithConnection(conn);
