@@ -105,30 +105,41 @@ const createMySQLWrap = (poolCluster, options, connection) => {
     const isSQLReadOrWrite = statementRaw => /^SELECT/i.test(statementRaw.trim()) ?
         'read' : 'write';
 
-    const runCursor = (q, fig) => {
-        const orderBy = _.map(
-            _.isArray(fig.orderBy) ? fig.orderBy : [fig.orderBy],
-            o =>  _.isString(o) ?
-                { field: o, isAscending: true } :
-                _.extend(
-                    _.omit(_.clone(o), 'direction'),
-                    { isAscending: o.direction === 'DESC' ? false : true }
-                )
-        );
+    const mapOrderBy = raw => _.map(
+        _.isArray(raw) ? raw : [raw],
+        o =>  _.isString(o) ?
+            { field: o, isAscending: true } :
+            _.extend(
+                _.omit(_.clone(o), 'direction'),
+                { isAscending: o.direction === 'DESC' ? false : true }
+            )
+    );
 
+    const CURSOR_DELIMETER = '#';
+
+    self.encodeCursor = (orderByRaw, row) => {
+        const orderBy = mapOrderBy(orderByRaw);
+        return new Buffer(_.map(
+            orderBy,
+            o => o.serialize ? o.serialize(row[o.field]) : String(row[o.field])
+        ).join(CURSOR_DELIMETER)).toString('base64');
+    };
+
+    const runCursor = (q, fig) => {
+        const orderBy = mapOrderBy(fig.orderBy);
         const isAscending = fig.last && !fig.first ? false : true;
-        const delimeter = '#';
+        // const delimeter = '#';
 
         const decodeCursor = c => _.map(
             new Buffer(c, 'base64')
-            .toString('ascii').split(delimeter),
+            .toString('ascii').split(CURSOR_DELIMETER),
             (v, i) => orderBy[i].deserialize ? orderBy[i].deserialize(v) : v
         );
 
-        const encodeCursor = r => new Buffer(_.map(
-            orderBy,
-            o => o.serialize ? o.serialize(r[o.field]) : String(r[o.field])
-        ).join(delimeter)).toString('base64');
+        // const encodeCursor = r => new Buffer(_.map(
+        //     orderBy,
+        //     o => o.serialize ? o.serialize(r[o.field]) : String(r[o.field])
+        // ).join(CURSOR_DELIMETER)).toString('base64');
 
         const buildWhereArgs = (values, isGreaterThan) => {
             const build = (values, orderBy, isGreaterThan) => {
@@ -215,7 +226,7 @@ const createMySQLWrap = (poolCluster, options, connection) => {
             },
             edges: _.map(
                 resp.results,
-                r => ({ node: r, cursor: encodeCursor(r) })
+                r => ({ node: r, cursor: self.encodeCursor(orderBy, r) })
             )
         }));
     };
@@ -279,6 +290,23 @@ const createMySQLWrap = (poolCluster, options, connection) => {
             conn && conn.release && conn.release();
         }
     };
+
+    // self.beginTransaction = () => getConnection('write')
+    // .then(conn => {
+    //     let sql = createMySQLWrap(null, options, conn);
+    //     return new Promise((resolve, reject) => conn.beginTransaction(
+    //         err => err ? reject(err) : resolve()
+    //     ))
+    //     .then(() => {
+    //         sql.commit = () => new Promise((resolve, reject) => conn.commit(
+    //             err => {
+
+    //                 return err ? reject(err) : resolve()
+    //             }
+    //         ))
+    //         .then(() => )
+    //     })
+    // });
 
     self.query = (statementRaw, values) => {
         const statementObject = getStatementObject(statementRaw);

@@ -16,8 +16,13 @@ describe('mysqlWrap', () => {
         let pool = mysql.createPool(config.mysql);
         this.sql = createNodeMySQL(pool);
         pool.getConnection((err, conn) => {
-            this.masterConn = conn;
-            done();
+            if(err) {
+                console.log(err, err.stack);
+            }
+            else {
+                this.masterConn = conn;
+                done();
+            }
         });
     });
 
@@ -63,6 +68,52 @@ describe('mysqlWrap', () => {
             }).done();
         });
     });
+
+    // describe('transaction', () => {
+    //     it('should commit transaction', done => {
+    //         this.sql.beginTransaction()
+    //         .then(sql => {
+    //             return sql.insert('table', { id: 4 })
+    //             .then(() => sql.insert('table2', { field: 'new' }))
+    //             .then(() => Promise.props({
+    //                 table: sql.selectOne('table',  { id: 4 }),
+    //                 table2: sql.selectOne('table2', { field: 'new' })
+    //             }))
+    //             .then(resp => {
+    //                 expect(resp.table).to.be.null;
+    //                 expect(resp.table2).to.be.null;
+    //             })
+    //             .then(() => sql.commit());
+    //         })
+    //         .then(() => Promise.props({
+    //             table: sql.selectOne('table',  { id: 4 }),
+    //             table2: sql.selectOne('table2', { field: 'new' })
+    //         }))
+    //         .then(resp => {
+    //             expect(resp.table).to.be.ok;
+    //             expect(resp.table2).to.be.ok;
+    //             done();
+    //         }).done();
+    //     });
+
+    //     it('should rollback transaction', done => {
+    //         this.sql.beginTransaction()
+    //         .then(sql => {
+    //             return sql.insert('table', { id: 4 })
+    //             .then(() => sql.insert('table2', { field: 'new' }))
+    //             .then(() => sql.rollback());
+    //         })
+    //          .then(() => Promise.props({
+    //             table: sql.selectOne('table',  { id: 4 }),
+    //             table2: sql.selectOne('table2', { field: 'new' })
+    //         }))
+    //         .then(resp => {
+    //             expect(resp.table).to.be.null;
+    //             expect(resp.table2).to.be.null;
+    //             done();
+    //         }).done();
+    //     });
+    // });
 
     describe('build', () => {
         before(done => {
